@@ -30,7 +30,7 @@ pipeline{
     stage("Run docker compose"){
       steps{
         dir("tpjenkins-spring"){
-          sh "docker-compose up -d"
+          sh "docker compose up -d"
         }
       }
     } 
