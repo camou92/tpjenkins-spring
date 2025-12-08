@@ -20,7 +20,7 @@ pipeline{
 
     stage("Generate image"){
       steps{
-        dir("tp2jenkins"){
+        dir("tpjenkins-spring"){
           sh "mvn clean install"
           sh "docker build -t tp2jenk ."
         }
@@ -29,7 +29,7 @@ pipeline{
 
     stage("Run docker compose"){
       steps{
-        dir("tp2jenkins"){
+        dir("tpjenkins-spring"){
           sh "docker-compose up -d"
         }
       }
