@@ -58,6 +58,20 @@ pipeline {
       }
     }
 
+     stage("Create / Update K8s Docker Registry Secret") {
+          steps {
+            withCredentials([usernamePassword(credentialsId: 'nexus-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+              sh '''
+                kubectl delete secret nexus-docker --ignore-not-found
+                kubectl create secret docker-registry nexus-docker \
+                  --docker-server=${DOCKER_REPO.split('/')[0]} \
+                  --docker-username=$DOCKER_USER \
+                  --docker-password=$DOCKER_PASS \
+              '''
+            }
+          }
+        }
+
     stage("Update K8s Manifests & Push to Git") {
       steps {
         dir("tpjenkins-spring") {
