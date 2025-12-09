@@ -19,5 +19,5 @@ spec:
           image: 192.168.11.104:5001/tp2jenk:latest
           ports:
             - containerPort: 8080
-          imagePullSecrets:
-            - name: nexus-docker
+      imagePullSecrets:
+        - name: nexus-docker
