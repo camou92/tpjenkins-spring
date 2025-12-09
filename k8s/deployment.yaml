@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tp2jenk
+  labels:
+    app: tp2jenk
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tp2jenk
+  template:
+    metadata:
+      labels:
+        app: tp2jenk
+    spec:
+      containers:
+        - name: tp2jenk
+          image: 192.168.11.104:5001/tp2jenk:latest
+          ports:
+            - containerPort: 8080
