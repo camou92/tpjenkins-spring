@@ -2,14 +2,13 @@ pipeline {
   agent any
 
   tools {
-    maven 'maven'   // nom du Maven tool configuré dans Jenkins (Global Tool Configuration)
-    // optionally docker tool if configured
+    maven 'maven'
   }
 
   environment {
-    NEXUS_HOST = "192.168.11.104:8081"            // adapte si nécessaire
-    IMAGE_NAME = "tp2jenk"                   // nom local de l'image
-    DOCKER_REPO = "192.168.11.104:5001/tp2jenk"   // si tu utilises Nexus Docker hosted sur le port 5001
+    NEXUS_HOST = "192.168.11.104:8081"
+    IMAGE_NAME = "tp2jenk"
+    DOCKER_REPO = "192.168.11.104:5001/tp2jenk"
   }
 
   stages {
@@ -26,7 +25,7 @@ pipeline {
       }
     }
 
-    stage("Build & Test (Maven)"){
+    stage("Build & Test Maven"){
       steps {
         dir("tpjenkins-spring") {
           sh "mvn -B clean install"
@@ -34,17 +33,13 @@ pipeline {
       }
     }
 
-    stage("Prepare Maven settings for Nexus"){
+    stage("Prepare settings.xml for Nexus Deploy"){
       steps {
         dir("tpjenkins-spring") {
-          // on récupère les credentials Jenkins (ID 'nexus-cred') et on génère settings.xml
           withCredentials([usernamePassword(credentialsId: 'nexus-cred', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
             sh '''
               cat > settings.xml <<EOF
-<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
-                              http://maven.apache.org/xsd/settings-1.0.0.xsd">
+<settings>
   <servers>
     <server>
       <id>nexus</id>
@@ -60,16 +55,15 @@ EOF
       }
     }
 
-    stage("Deploy to Nexus (mvn deploy)"){
+    stage("Deploy Maven Artifacts to Nexus"){
       steps {
         dir("tpjenkins-spring") {
-          // On utilise le settings.xml précédent
           sh "mvn -B deploy -s settings.xml -DskipTests=false"
         }
       }
     }
 
-    stage("Build Docker image"){
+    stage("Build Docker Image"){
       steps {
         dir("tpjenkins-spring") {
           sh "docker build -t ${IMAGE_NAME} ."
@@ -77,23 +71,17 @@ EOF
       }
     }
 
-    stage("Push Docker image to Nexus (optional)"){
+    stage("Push Docker Image to Nexus"){
       steps {
         dir("tpjenkins-spring") {
-          // se connecter au registre Nexus (si tu as créé un docker hosted repo à port 5001)
-          // utilise les mêmes creds 'nexus-cred' ou un autre id 'nexus-docker-cred'
           withCredentials([usernamePassword(credentialsId: 'nexus-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
             sh """
-              # Tag l'image pour le registre Nexus
               docker tag ${IMAGE_NAME} ${DOCKER_REPO}:latest
 
-              # Login (HTTP plain possible si Nexus en http; si TLS, adapte)
               echo ${DOCKER_PASS} | docker login ${DOCKER_REPO.split('/')[0]} --username ${DOCKER_USER} --password-stdin
 
-              # Push
               docker push ${DOCKER_REPO}:latest
 
-              # logout
               docker logout ${DOCKER_REPO.split('/')[0]}
             """
           }
@@ -101,17 +89,36 @@ EOF
       }
     }
 
-  } // stages
+    stage("Deploy & Run Application with Docker Compose"){
+      steps {
+        dir("tpjenkins-spring") {
+
+          sh """
+            # Stop running application (if exists)
+            docker compose down || true
+
+            # Pull the latest image from Nexus
+            docker pull ${DOCKER_REPO}:latest
+
+            # Start application
+            docker compose up -d
+          """
+        }
+      }
+    }
+
+  } // end stages
 
   post {
     always {
       cleanWs()
     }
     success {
-      echo "Pipeline finished successfully."
+      echo "🚀 Pipeline SUCCESS — Application is deployed and running."
     }
     failure {
-      echo "Pipeline failed."
+      echo "❌ Pipeline FAILED — Check logs."
     }
   }
+
 }

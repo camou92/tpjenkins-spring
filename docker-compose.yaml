@@ -1,7 +1,5 @@
-version: "3.3"
 services:
-
-    spring-boot-app:
-        image: tp2jenk:latest
-        ports:
-            - "0.0.0.0:8084:8080"
+  app:
+    image: 192.168.11.104:5001/tp2jenk:latest
+    ports:
+      - "8080:8080"
