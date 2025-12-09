@@ -58,26 +58,29 @@ pipeline {
       }
     }
 
-    stage("Update K8s Manifests & Push to Git") {
-      steps {
-        dir("tpjenkins-spring") {
-          withCredentials([usernamePassword(credentialsId: 'github', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
-            sh """
-              git config user.email "cmohamed992@gmail.com"
-              git config user.name "camou92"
+   stage("Update K8s Manifests & Push to Git") {
+     steps {
+       dir("tpjenkins-spring") {
+         withCredentials([usernamePassword(credentialsId: 'github', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
+           sh """
+             git config user.email "cmohamed992@gmail.com"
+             git config user.name "camou92"
 
-              # Mettre à jour le tag Docker dans kustomization.yaml
-              sed -i 's|newTag:.*|newTag: latest|' ${K8S_DIR}/kustomization.yaml
+             # Mettre à jour le tag Docker dans kustomization.yaml
+             sed -i "s|newTag:.*|newTag: latest|" ${K8S_DIR}/kustomization.yaml
 
-              # Commit & push
-              git add ${K8S_DIR}/kustomization.yaml
-              git commit -m "Update Docker image to latest"
-              git push https://${GIT_USER}:${GIT_PASS}@${GIT_URL.replaceFirst('https://','')} HEAD:main
-            """
-          }
-        }
-      }
-    }
+             # Commit seulement si modification
+             git add ${K8S_DIR}/kustomization.yaml
+             git diff --cached --quiet || git commit -m "Update Docker image to latest"
+
+             # Push
+             git push https://${GIT_USER}:${GIT_PASS}@${GIT_URL.replaceFirst('https://','')} HEAD:main
+           """
+         }
+       }
+     }
+   }
+
 
     stage("Trigger ArgoCD Sync") {
       steps {
