@@ -2,4 +2,4 @@ services:
   app:
     image: 192.168.11.104:5001/tp2jenk:latest
     ports:
-      - "8080:8080"
+      - "8084:8080"
