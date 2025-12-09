@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: tp2jenk
-          image: 192.168.11.104:5001/tp2jenk:latest
+          image: 192.168.11.104:5001/tp2jenk:BUILD_NUMBER_PLACEHOLDER
           ports:
             - containerPort: 8080
       imagePullSecrets:

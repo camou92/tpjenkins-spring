@@ -38,7 +38,7 @@ pipeline {
       steps {
         dir("tpjenkins-spring") {
           withCredentials([usernamePassword(credentialsId: 'nexus-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-            sh '''
+            sh """
               set -e
               docker build -t ${DOCKER_IMAGE} .
               docker tag ${DOCKER_IMAGE} ${DOCKER_REPO}:latest
@@ -47,7 +47,7 @@ pipeline {
               docker push ${DOCKER_IMAGE}
               docker push ${DOCKER_REPO}:latest
               docker logout ${DOCKER_REPO.split('/')[0]}
-            '''
+            """
           }
         }
       }
@@ -56,8 +56,8 @@ pipeline {
     stage('3. Mise à jour des manifests Kubernetes') {
       agent none
       steps {
-        withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
-          sh '''
+        withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
+          sh """
             set -e
             git clone ${GIT_URL} temp-k8s-repo
             cd temp-k8s-repo
@@ -65,13 +65,13 @@ pipeline {
             git config user.email "cmohamed992@gmail.com"
             git config user.name "camou92"
 
-            sed -i "s|newTag:.*|newTag: ${BUILD_NUMBER}|" ${K8S_DIR}/kustomization.yaml
+            sed -i "s|BUILD_NUMBER_PLACEHOLDER|${BUILD_NUMBER}|" k8s/kustomization.yaml
 
             git add ${K8S_DIR}/kustomization.yaml
             git diff --cached --quiet || git commit -m "Update Docker image to ${BUILD_NUMBER}"
 
             git push https://${GITHUB_TOKEN}@github.com/camou92/tpjenkins-spring.git HEAD:main
-          '''
+          """
         }
       }
     }
@@ -79,11 +79,11 @@ pipeline {
     stage("4. Trigger ArgoCD Sync") {
       steps {
         withCredentials([usernamePassword(credentialsId: 'argocd-cred', usernameVariable: 'ARGO_USER', passwordVariable: 'ARGO_PASS')]) {
-          sh '''
+          sh """
             set -e
             argocd login ${ARGOCD_SERVER} --username $ARGO_USER --password $ARGO_PASS --insecure
             argocd app sync ${ARGOCD_APP_NAME}
-          '''
+          """
         }
       }
     }
