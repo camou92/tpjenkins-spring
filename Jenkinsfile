@@ -89,25 +89,29 @@ EOF
       }
     }
 
-    stage("Deploy & Run Application with Docker Compose"){
+    stage("Deploy & Run Application with Docker Compose") {
       steps {
         dir("tpjenkins-spring") {
+          withCredentials([usernamePassword(credentialsId: 'nexus-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+            sh """
+              # Login avant de faire pull
+              echo ${DOCKER_PASS} | docker login ${DOCKER_REPO.split('/')[0]} --username ${DOCKER_USER} --password-stdin
 
-          sh """
-            # Stop running application (if exists)
-            docker compose down || true
+              docker compose down || true
 
-            # Pull the latest image from Nexus
-            docker pull ${DOCKER_REPO}:latest
+              # Récuperer la dernière image
+              docker pull ${DOCKER_REPO}:latest
 
-            # Start application
-            docker compose up -d
-          """
+              # Démarrer l'app
+              docker compose up -d
+
+              # Logout après
+              docker logout ${DOCKER_REPO.split('/')[0]}
+            """
+          }
         }
       }
     }
-
-  } // end stages
 
   post {
     always {
