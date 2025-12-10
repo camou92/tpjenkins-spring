@@ -1,5 +1,4 @@
 pipeline {
-
   agent any
 
   tools {
@@ -22,11 +21,11 @@ pipeline {
 
     stage("Clean workspace safe") {
       steps {
-        cleanWs()  // ⬅ supprime correctement le workspace (fix Jenkins Git)
+        cleanWs()
       }
     }
 
-    stage('0. Checkout') {
+    stage('0. Checkout App Repo') {
       steps {
         checkout([$class: 'GitSCM', branches: [[name: '*/main']],
             userRemoteConfigs: [[url: "${GIT_APP_REPO}"]]])
@@ -70,7 +69,7 @@ EOF
         withCredentials([usernamePassword(credentialsId: 'nexus-cred',
           usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
 
-          sh """
+          sh '''
             set -e
             docker build -t ${DOCKER_IMAGE} .
             docker tag ${DOCKER_IMAGE} ${DOCKER_REPO}:latest
@@ -81,7 +80,7 @@ EOF
             docker push ${DOCKER_IMAGE}
             docker push ${DOCKER_REPO}:latest
             docker logout ${DOCKER_REPO.split('/')[0]}
-          """
+          '''
         }
       }
     }
@@ -89,22 +88,25 @@ EOF
     stage('3. Update Kubernetes Manifests Repo') {
       steps {
         withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
-          sh """
+          sh '''
             set -e
             rm -rf k8s-repo
-            git clone ${GIT_K8S_REPO} k8s-repo
+            # Clone avec token sécurisé
+            git clone https://${GITHUB_TOKEN}@github.com/camou92/tpjenk-k8s.git k8s-repo
             cd k8s-repo
 
             git config user.email "cmohamed992@gmail.com"
             git config user.name "camou92"
 
+            # Mettre à jour le BUILD_NUMBER dans kustomization.yaml
             sed -i "s|BUILD_NUMBER_PLACEHOLDER|${BUILD_NUMBER}|" ${K8S_DIR}/kustomization.yaml
 
             git add .
             git diff --cached --quiet || git commit -m "Update image to ${BUILD_NUMBER}"
 
-            git push https://${GITHUB_TOKEN}@${GIT_K8S_REPO.replace('https://','')} HEAD:main
-          """
+            # Push sécurisé avec token
+            git push https://${GITHUB_TOKEN}@github.com/camou92/tpjenk-k8s.git HEAD:main
+          '''
         }
       }
     }
@@ -114,10 +116,10 @@ EOF
         withCredentials([usernamePassword(credentialsId: 'argocd-cred',
           usernameVariable: 'ARGO_USER', passwordVariable: 'ARGO_PASS')]) {
 
-          sh """
+          sh '''
             argocd login ${ARGOCD_SERVER} --username "$ARGO_USER" --password "$ARGO_PASS" --insecure
             argocd app sync ${ARGOCD_APP_NAME}
-          """
+          '''
         }
       }
     }
