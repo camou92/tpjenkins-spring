@@ -88,22 +88,24 @@ EOF
 
     stage('3. Update Kubernetes Manifests') {
       steps {
-        sh '''
-          set -e
-          # Remplacer BUILD_NUMBER_PLACEHOLDER dans kustomization.yaml
-          sed -i "s|BUILD_NUMBER_PLACEHOLDER|${BUILD_NUMBER}|" ${K8S_DIR}/kustomization.yaml
+        withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
+          sh '''
+            set -e
+            # Remplacer BUILD_NUMBER_PLACEHOLDER dans kustomization.yaml
+            sed -i "s|BUILD_NUMBER_PLACEHOLDER|${BUILD_NUMBER}|" ${K8S_DIR}/kustomization.yaml
 
-          git config user.email "cmohamed992@gmail.com"
-          git config user.name "camou92"
+            git config user.email "cmohamed992@gmail.com"
+            git config user.name "camou92"
 
-          # Créer ou se placer sur main pour push
-          git checkout -B main
+            # Créer ou se placer sur main pour push
+            git checkout -B main
 
-          git add ${K8S_DIR}/kustomization.yaml
-          git diff --cached --quiet || git commit -m "Update image to ${BUILD_NUMBER}"
+            git add ${K8S_DIR}/kustomization.yaml
+            git diff --cached --quiet || git commit -m "Update image to ${BUILD_NUMBER}"
 
-          git push origin main
-        '''
+            git push https://${GITHUB_TOKEN}@github.com/camou92/tpjenkins-spring.git main
+          '''
+        }
       }
     }
 
