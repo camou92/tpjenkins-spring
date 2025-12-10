@@ -3,7 +3,7 @@ pipeline {
   agent {
     docker {
       image 'donald284/maven-jenkins-agent:v3'
-      args '--user root -v /var/run/docker.sock:/var/run/docker.sock'
+      args '-u root -v /var/run/docker.sock:/var/run/docker.sock'
     }
   }
 
@@ -15,16 +15,17 @@ pipeline {
     K8S_DIR = "k8s"
     ARGOCD_APP_NAME = "tp2jenk"
     ARGOCD_SERVER = "192.168.39.3:32099"
-    DOCKER_IMAGE = "${DOCKER_REPO}:${BUILD_NUMBER}" // tag unique basé sur BUILD_NUMBER
+    DOCKER_IMAGE = "${DOCKER_REPO}:${BUILD_NUMBER}"
   }
 
-    stage("Clean up"){
+  stages {
+
+    stage("Clean up") {
       steps {
         deleteDir()
       }
     }
 
-    // 0. Checkout
     stage('0. Checkout') {
       steps {
         sh "git clone ${GIT_URL} tpjenkins-spring"
@@ -32,7 +33,6 @@ pipeline {
       }
     }
 
-    // 1. Build et tests Maven
     stage('1. Build et Tests (Maven)') {
       steps {
         dir("tpjenkins-spring") {
@@ -41,11 +41,12 @@ pipeline {
       }
     }
 
-    // 2. Build et push Docker
     stage('2. Build et Push Docker') {
       steps {
         dir("tpjenkins-spring") {
-          withCredentials([usernamePassword(credentialsId: 'nexus-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+          withCredentials([usernamePassword(credentialsId: 'nexus-cred',
+            usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+
             sh """
               set -e
               docker build -t ${DOCKER_IMAGE} .
@@ -61,9 +62,7 @@ pipeline {
       }
     }
 
-    // 3. Mise à jour des manifests Kubernetes
     stage('3. Mise à jour des manifests Kubernetes') {
-      agent none
       steps {
         withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
           sh """
@@ -74,7 +73,6 @@ pipeline {
             git config user.email "cmohamed992@gmail.com"
             git config user.name "camou92"
 
-            # Mettre à jour le tag Docker dans kustomization.yaml
             sed -i "s|BUILD_NUMBER_PLACEHOLDER|${BUILD_NUMBER}|" ${K8S_DIR}/kustomization.yaml
 
             git add ${K8S_DIR}/kustomization.yaml
@@ -86,10 +84,11 @@ pipeline {
       }
     }
 
-    // 4. Trigger ArgoCD Sync
     stage("4. Trigger ArgoCD Sync") {
       steps {
-        withCredentials([usernamePassword(credentialsId: 'argocd-cred', usernameVariable: 'ARGO_USER', passwordVariable: 'ARGO_PASS')]) {
+        withCredentials([usernamePassword(credentialsId: 'argocd-cred',
+          usernameVariable: 'ARGO_USER', passwordVariable: 'ARGO_PASS')]) {
+
           sh """
             set -e
             argocd login ${ARGOCD_SERVER} --username $ARGO_USER --password $ARGO_PASS --insecure
