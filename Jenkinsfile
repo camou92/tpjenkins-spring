@@ -15,17 +15,20 @@ pipeline {
     K8S_DIR = "k8s"
     ARGOCD_APP_NAME = "tp2jenk"
     ARGOCD_SERVER = "192.168.39.3:32099"
-    DOCKER_IMAGE = "${DOCKER_REPO}:${BUILD_NUMBER}"
+    DOCKER_IMAGE = "${DOCKER_REPO}:${BUILD_NUMBER}" // tag unique basé sur BUILD_NUMBER
   }
 
   stages {
 
+    // 0. Checkout
     stage('0. Checkout') {
       steps {
-        git branch: 'main', url: "${GIT_URL}"
+        sh "git clone ${GIT_URL} tpjenkins-spring"
+        sh "ls -l tpjenkins-spring"
       }
     }
 
+    // 1. Build et tests Maven
     stage('1. Build et Tests (Maven)') {
       steps {
         dir("tpjenkins-spring") {
@@ -34,6 +37,7 @@ pipeline {
       }
     }
 
+    // 2. Build et push Docker
     stage('2. Build et Push Docker') {
       steps {
         dir("tpjenkins-spring") {
@@ -53,6 +57,7 @@ pipeline {
       }
     }
 
+    // 3. Mise à jour des manifests Kubernetes
     stage('3. Mise à jour des manifests Kubernetes') {
       agent none
       steps {
@@ -65,7 +70,8 @@ pipeline {
             git config user.email "cmohamed992@gmail.com"
             git config user.name "camou92"
 
-            sed -i "s|BUILD_NUMBER_PLACEHOLDER|${BUILD_NUMBER}|" k8s/kustomization.yaml
+            # Mettre à jour le tag Docker dans kustomization.yaml
+            sed -i "s|BUILD_NUMBER_PLACEHOLDER|${BUILD_NUMBER}|" ${K8S_DIR}/kustomization.yaml
 
             git add ${K8S_DIR}/kustomization.yaml
             git diff --cached --quiet || git commit -m "Update Docker image to ${BUILD_NUMBER}"
@@ -76,6 +82,7 @@ pipeline {
       }
     }
 
+    // 4. Trigger ArgoCD Sync
     stage("4. Trigger ArgoCD Sync") {
       steps {
         withCredentials([usernamePassword(credentialsId: 'argocd-cred', usernameVariable: 'ARGO_USER', passwordVariable: 'ARGO_PASS')]) {
@@ -88,10 +95,9 @@ pipeline {
       }
     }
 
-  }
+  } // end stages
 
   post {
-
     success {
       slackSend(
         channel: '#tous-camoutech',
@@ -99,7 +105,6 @@ pipeline {
         message: "🎉 SUCCESS — Build #${BUILD_NUMBER} déployé avec succès sur Kubernetes via ArgoCD ! 🚀"
       )
     }
-
     failure {
       slackSend(
         channel: '#tous-camoutech',
@@ -107,7 +112,6 @@ pipeline {
         message: "❌ FAILURE — Le pipeline #${BUILD_NUMBER} a échoué ! ⚠️"
       )
     }
-
   }
 
 }
