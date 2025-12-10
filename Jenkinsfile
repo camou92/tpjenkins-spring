@@ -67,7 +67,6 @@ EOF
       steps {
         withCredentials([usernamePassword(credentialsId: 'nexus-cred',
           usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-
           sh '''
             set -e
             # Build Docker image avec tag BUILD_NUMBER
@@ -88,33 +87,30 @@ EOF
     }
 
     stage('3. Update Kubernetes Manifests') {
-  steps {
-    sh '''
-      set -e
+      steps {
+        sh '''
+          set -e
+          # Remplacer BUILD_NUMBER_PLACEHOLDER dans kustomization.yaml
+          sed -i "s|BUILD_NUMBER_PLACEHOLDER|${BUILD_NUMBER}|" ${K8S_DIR}/kustomization.yaml
 
-      # Remplacer BUILD_NUMBER_PLACEHOLDER dans kustomization.yaml
-      sed -i "s|BUILD_NUMBER_PLACEHOLDER|${BUILD_NUMBER}|" ${K8S_DIR}/kustomization.yaml
+          git config user.email "cmohamed992@gmail.com"
+          git config user.name "camou92"
 
-      git config user.email "cmohamed992@gmail.com"
-      git config user.name "camou92"
+          # Créer ou se placer sur main pour push
+          git checkout -B main
 
-      # Créer ou se placer sur main
-      git checkout -B main
+          git add ${K8S_DIR}/kustomization.yaml
+          git diff --cached --quiet || git commit -m "Update image to ${BUILD_NUMBER}"
 
-      git add ${K8S_DIR}/kustomization.yaml
-      git diff --cached --quiet || git commit -m "Update image to ${BUILD_NUMBER}"
-
-      git push origin main
-    '''
-  }
-}
-
+          git push origin main
+        '''
+      }
+    }
 
     stage("4. Trigger ArgoCD Sync") {
       steps {
         withCredentials([usernamePassword(credentialsId: 'argocd-cred',
           usernameVariable: 'ARGO_USER', passwordVariable: 'ARGO_PASS')]) {
-
           sh '''
             argocd login ${ARGOCD_SERVER} --username "$ARGO_USER" --password "$ARGO_PASS" --insecure
             argocd app sync ${ARGOCD_APP_NAME}
