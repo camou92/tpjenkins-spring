@@ -8,41 +8,40 @@ pipeline {
   environment {
     NEXUS_HOST = "192.168.122.1:8081"
     IMAGE_NAME = "tp2jenk"
+    DOCKER_REPO = "192.168.122.1:5001/tp2jenk"
     GIT_APP_REPO = "https://github.com/camou92/tpjenkins-spring.git"
     K8S_DIR = "k8s"
     ARGOCD_APP_NAME = "tp2jenk"
     ARGOCD_SERVER = "192.168.39.3:32099"
-    DOCKER_IMAGE = "${IMAGE_NAME}:${BUILD_NUMBER}"
+    DOCKER_IMAGE = "${DOCKER_REPO}:${BUILD_NUMBER}"
   }
 
   stages {
 
-    stage("Clean workspace") {
+    stage("Clean workspace safe") {
       steps {
         cleanWs()
       }
     }
 
-    stage("Checkout code") {
+    stage('0. Checkout App Repo') {
       steps {
         checkout([$class: 'GitSCM', branches: [[name: '*/main']],
-                  userRemoteConfigs: [[url: "${GIT_APP_REPO}"]]])
+            userRemoteConfigs: [[url: "${GIT_APP_REPO}"]]])
       }
     }
 
-    stage("Build & Tests") {
+    stage('1. Build & Tests') {
       steps {
         sh "mvn -B clean install"
       }
     }
 
-    stage("Deploy Maven Artifact to Nexus") {
+    stage("Prepare Maven settings.xml for Nexus") {
       steps {
-        withCredentials([usernamePassword(credentialsId: 'nexus-cred',
-                                         usernameVariable: 'NEXUS_USER',
-                                         passwordVariable: 'NEXUS_PASS')]) {
+        withCredentials([usernamePassword(credentialsId: 'nexus-cred', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
           sh '''
-            cat > settings.xml <<EOF
+cat > settings.xml <<EOF
 <settings>
   <servers>
     <server>
@@ -53,34 +52,52 @@ pipeline {
   </servers>
 </settings>
 EOF
-            mvn deploy -s settings.xml -DskipTests=false
           '''
         }
       }
     }
 
-    stage("Build Docker Image in Minikube") {
+    stage("Deploy Maven Artifacts") {
       steps {
-        sh '''
-          set -e
-          # Configurer Docker pour utiliser le daemon de Minikube
-          eval $(minikube -p minikube docker-env)
-
-          # Build l'image avec le BUILD_NUMBER
-          docker build -t ${DOCKER_IMAGE} .
-        '''
+        sh "mvn deploy -s settings.xml -DskipTests=false"
       }
     }
 
-    stage("Update Kubernetes Manifests") {
+    stage('2. Build & Push Docker') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'nexus-cred',
+          usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+          sh '''
+            set -e
+            # Build Docker image avec tag BUILD_NUMBER
+            docker build -t ${DOCKER_IMAGE} .
+
+            # Extraire l'hôte du repo Docker pour login
+            DOCKER_HOST=$(echo ${DOCKER_REPO} | cut -d/ -f1)
+
+            echo "$DOCKER_PASS" | docker login $DOCKER_HOST --username "$DOCKER_USER" --password-stdin
+
+            # Push uniquement l'image versionnée
+            docker push ${DOCKER_IMAGE}
+
+            docker logout $DOCKER_HOST
+          '''
+        }
+      }
+    }
+
+    stage('3. Update Kubernetes Manifests') {
       steps {
         withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
           sh '''
             set -e
-            sed -i "s|BUILD_NUMBER_PLACEHOLDER|\"${BUILD_NUMBER}\"|" ${K8S_DIR}/kustomization.yaml
+            # Remplacer BUILD_NUMBER_PLACEHOLDER dans kustomization.yaml
+            sed -i "s|BUILD_NUMBER_PLACEHOLDER|\"${BUILD_NUMBER}\"|" k8s/kustomization.yaml
 
             git config user.email "cmohamed992@gmail.com"
             git config user.name "camou92"
+
+            # Créer ou se placer sur main pour push
             git checkout -B main
 
             git add ${K8S_DIR}/kustomization.yaml
@@ -92,11 +109,10 @@ EOF
       }
     }
 
-    stage("Sync ArgoCD") {
+    stage("4. Trigger ArgoCD Sync") {
       steps {
         withCredentials([usernamePassword(credentialsId: 'argocd-cred',
-                                         usernameVariable: 'ARGO_USER',
-                                         passwordVariable: 'ARGO_PASS')]) {
+          usernameVariable: 'ARGO_USER', passwordVariable: 'ARGO_PASS')]) {
           sh '''
             argocd login ${ARGOCD_SERVER} --username "$ARGO_USER" --password "$ARGO_PASS" --insecure
             argocd app sync ${ARGOCD_APP_NAME}

@@ -16,8 +16,6 @@ spec:
     spec:
       containers:
         - name: tp2jenk
-          image: 192.168.122.1:5001/tp2jenk
+          image: 192.168.122.1:5001/tp2jenk:BUILD_NUMBER_PLACEHOLDER
           ports:
             - containerPort: 8080
-      imagePullSecrets:
-        - name: nexus-docker1

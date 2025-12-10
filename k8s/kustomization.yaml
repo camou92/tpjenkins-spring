@@ -1,6 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Liste des manifests Kubernetes
 resources:
   - deployment.yaml
   - service.yaml
+
+# Mise à jour automatique de l'image dans le Deployment
 images:
   - name: 192.168.122.1:5001/tp2jenk
-    newTag: "14"
+    newTag: "BUILD_NUMBER_PLACEHOLDER"
