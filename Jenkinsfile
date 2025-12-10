@@ -92,7 +92,7 @@ EOF
           sh '''
             set -e
             # Remplacer BUILD_NUMBER_PLACEHOLDER dans kustomization.yaml
-            sed -i "s|BUILD_NUMBER_PLACEHOLDER|${BUILD_NUMBER}|" ${K8S_DIR}/kustomization.yaml
+            sed -i "s|BUILD_NUMBER_PLACEHOLDER|\"${BUILD_NUMBER}\"|" k8s/kustomization.yaml
 
             git config user.email "cmohamed992@gmail.com"
             git config user.name "camou92"
