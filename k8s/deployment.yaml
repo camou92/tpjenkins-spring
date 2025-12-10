@@ -20,4 +20,4 @@ spec:
           ports:
             - containerPort: 8080
       imagePullSecrets:
-        - name: nexus-docker
+        - name: nexus-docker1
