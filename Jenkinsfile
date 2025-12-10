@@ -18,7 +18,11 @@ pipeline {
     DOCKER_IMAGE = "${DOCKER_REPO}:${BUILD_NUMBER}" // tag unique basé sur BUILD_NUMBER
   }
 
-  stages {
+    stage("Clean up"){
+      steps {
+        deleteDir()
+      }
+    }
 
     // 0. Checkout
     stage('0. Checkout') {
