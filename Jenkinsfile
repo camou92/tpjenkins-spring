@@ -48,10 +48,13 @@ pipeline {
 
             sh """
               set -e
+              docker --version
               docker build -t ${DOCKER_IMAGE} .
               docker tag ${DOCKER_IMAGE} ${DOCKER_REPO}:latest
 
-              echo $DOCKER_PASS | docker login ${DOCKER_REPO.split('/')[0]} --username $DOCKER_USER --password-stdin
+              echo "$DOCKER_PASS" | docker login ${DOCKER_REPO.split('/')[0]} \
+                --username "$DOCKER_USER" --password-stdin
+
               docker push ${DOCKER_IMAGE}
               docker push ${DOCKER_REPO}:latest
               docker logout ${DOCKER_REPO.split('/')[0]}
@@ -77,7 +80,7 @@ pipeline {
             git add ${K8S_DIR}/kustomization.yaml
             git diff --cached --quiet || git commit -m "Update Docker image to ${BUILD_NUMBER}"
 
-            git push https://${GITHUB_TOKEN}@github.com/camou92/tpjenkins-spring.git HEAD:main
+            git push https://${GITHUB_TOKEN}@${GIT_URL.replace('https://', '')} HEAD:main
           """
         }
       }
@@ -90,28 +93,28 @@ pipeline {
 
           sh """
             set -e
-            argocd login ${ARGOCD_SERVER} --username $ARGO_USER --password $ARGO_PASS --insecure
+            argocd login ${ARGOCD_SERVER} --username "$ARGO_USER" --password "$ARGO_PASS" --insecure
             argocd app sync ${ARGOCD_APP_NAME}
           """
         }
       }
     }
 
-  } // end stages
+  }
 
   post {
     success {
       slackSend(
         channel: '#tous-camoutech',
         color: '#36a64f',
-        message: "🎉 SUCCESS — Build #${BUILD_NUMBER} déployé avec succès sur Kubernetes via ArgoCD ! 🚀"
+        message: "🎉 SUCCESS — Build #${BUILD_NUMBER} déployé sur Kubernetes via ArgoCD 🚀"
       )
     }
     failure {
       slackSend(
         channel: '#tous-camoutech',
         color: '#ff0000',
-        message: "❌ FAILURE — Le pipeline #${BUILD_NUMBER} a échoué ! ⚠️"
+        message: "❌ Pipeline #${BUILD_NUMBER} a échoué ⚠️"
       )
     }
   }
