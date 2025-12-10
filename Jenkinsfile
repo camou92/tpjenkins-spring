@@ -10,7 +10,6 @@ pipeline {
     IMAGE_NAME = "tp2jenk"
     DOCKER_REPO = "192.168.122.1:5001/tp2jenk"
     GIT_APP_REPO = "https://github.com/camou92/tpjenkins-spring.git"
-    GIT_K8S_REPO = "https://github.com/camou92/tpjenk-k8s.git"
     K8S_DIR = "k8s"
     ARGOCD_APP_NAME = "tp2jenk"
     ARGOCD_SERVER = "192.168.39.3:32099"
@@ -38,7 +37,7 @@ pipeline {
       }
     }
 
-    stage("Prepare Maven settings.xml for Nexus"){
+    stage("Prepare Maven settings.xml for Nexus") {
       steps {
         withCredentials([usernamePassword(credentialsId: 'nexus-cred', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
           sh '''
@@ -58,7 +57,7 @@ EOF
       }
     }
 
-    stage("Deploy Maven Artifacts"){
+    stage("Deploy Maven Artifacts") {
       steps {
         sh "mvn deploy -s settings.xml -DskipTests=false"
       }
@@ -71,43 +70,38 @@ EOF
 
           sh '''
             set -e
+            # Build Docker image avec tag BUILD_NUMBER
             docker build -t ${DOCKER_IMAGE} .
-            docker tag ${DOCKER_IMAGE} ${DOCKER_REPO}:latest
-            
-            echo "$DOCKER_PASS" | docker login ${DOCKER_REPO.split('/')[0]} \
-              --username "$DOCKER_USER" --password-stdin
 
+            # Extraire l'hôte du repo Docker pour login
+            DOCKER_HOST=$(echo ${DOCKER_REPO} | cut -d/ -f1)
+
+            echo "$DOCKER_PASS" | docker login $DOCKER_HOST --username "$DOCKER_USER" --password-stdin
+
+            # Push uniquement l'image versionnée
             docker push ${DOCKER_IMAGE}
-            docker push ${DOCKER_REPO}:latest
-            docker logout ${DOCKER_REPO.split('/')[0]}
+
+            docker logout $DOCKER_HOST
           '''
         }
       }
     }
 
-    stage('3. Update Kubernetes Manifests Repo') {
+    stage('3. Update Kubernetes Manifests') {
       steps {
-        withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
-          sh '''
-            set -e
-            rm -rf k8s-repo
-            # Clone avec token sécurisé
-            git clone https://${GITHUB_TOKEN}@github.com/camou92/tpjenk-k8s.git k8s-repo
-            cd k8s-repo
+        sh '''
+          set -e
 
-            git config user.email "cmohamed992@gmail.com"
-            git config user.name "camou92"
+          # Remplacer le BUILD_NUMBER_PLACEHOLDER dans kustomization.yaml
+          sed -i "s|BUILD_NUMBER_PLACEHOLDER|${BUILD_NUMBER}|" ${K8S_DIR}/kustomization.yaml
 
-            # Mettre à jour le BUILD_NUMBER dans kustomization.yaml
-            sed -i "s|BUILD_NUMBER_PLACEHOLDER|${BUILD_NUMBER}|" ${K8S_DIR}/kustomization.yaml
+          git config user.email "cmohamed992@gmail.com"
+          git config user.name "camou92"
 
-            git add .
-            git diff --cached --quiet || git commit -m "Update image to ${BUILD_NUMBER}"
-
-            # Push sécurisé avec token
-            git push https://${GITHUB_TOKEN}@github.com/camou92/tpjenk-k8s.git HEAD:main
-          '''
-        }
+          git add ${K8S_DIR}/kustomization.yaml
+          git diff --cached --quiet || git commit -m "Update image to ${BUILD_NUMBER}"
+          git push origin main
+        '''
       }
     }
 
