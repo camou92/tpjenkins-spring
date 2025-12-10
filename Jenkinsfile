@@ -7,9 +7,9 @@ pipeline {
   }
 
   environment {
-    NEXUS_HOST = "192.168.11.104:8081"
+    NEXUS_HOST = "192.168.122.1:8081"
     IMAGE_NAME = "tp2jenk"
-    DOCKER_REPO = "192.168.11.104:5001/tp2jenk"
+    DOCKER_REPO = "192.168.122.1:5001/tp2jenk"
     GIT_APP_REPO = "https://github.com/camou92/tpjenkins-spring.git"
     GIT_K8S_REPO = "https://github.com/camou92/tpjenk-k8s.git"
     K8S_DIR = "k8s"
