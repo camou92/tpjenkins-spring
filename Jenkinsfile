@@ -1,10 +1,9 @@
 pipeline {
 
-  agent {
-    docker {
-      image 'donald284/maven-jenkins-agent:v3'
-      args '-u root -v /var/run/docker.sock:/var/run/docker.sock'
-    }
+  agent any
+
+  tools {
+    maven 'maven'
   }
 
   environment {
