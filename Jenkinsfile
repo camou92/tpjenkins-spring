@@ -88,22 +88,27 @@ EOF
     }
 
     stage('3. Update Kubernetes Manifests') {
-      steps {
-        sh '''
-          set -e
+  steps {
+    sh '''
+      set -e
 
-          # Remplacer le BUILD_NUMBER_PLACEHOLDER dans kustomization.yaml
-          sed -i "s|BUILD_NUMBER_PLACEHOLDER|${BUILD_NUMBER}|" ${K8S_DIR}/kustomization.yaml
+      # Remplacer BUILD_NUMBER_PLACEHOLDER dans kustomization.yaml
+      sed -i "s|BUILD_NUMBER_PLACEHOLDER|${BUILD_NUMBER}|" ${K8S_DIR}/kustomization.yaml
 
-          git config user.email "cmohamed992@gmail.com"
-          git config user.name "camou92"
+      git config user.email "cmohamed992@gmail.com"
+      git config user.name "camou92"
 
-          git add ${K8S_DIR}/kustomization.yaml
-          git diff --cached --quiet || git commit -m "Update image to ${BUILD_NUMBER}"
-          git push origin main
-        '''
-      }
-    }
+      # Créer ou se placer sur main
+      git checkout -B main
+
+      git add ${K8S_DIR}/kustomization.yaml
+      git diff --cached --quiet || git commit -m "Update image to ${BUILD_NUMBER}"
+
+      git push origin main
+    '''
+  }
+}
+
 
     stage("4. Trigger ArgoCD Sync") {
       steps {
