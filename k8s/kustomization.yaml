@@ -9,4 +9,4 @@ resources:
 # Mise à jour automatique de l'image dans le Deployment
 images:
   - name: 192.168.11.104:5001/tp2jenk
-    newTag: "BUILD_NUMBER_PLACEHOLDER"
+    newTag: "19"
